@@ -88,13 +88,11 @@ void RobotController::AutoControl(UnicycleRobot& robot, float vl, float vr)
 	robot.SetCtrlInput(vl, vr);
 }
 
-void RobotSimulation::AddRobot(UnicycleRobot* robot, RobotController* controller)
+void RobotSimulation::AddRobot(UnicycleWMR::Robot* robot)
 {
 	try
 	{
-		robots.push_back(std::unique_ptr<UnicycleRobot>(robot));
-		controllers.push_back(std::unique_ptr <RobotController>(controller));
-		robotCtrlMap.insert({ robot, controller });
+		robots.push_back(unique_ptr<UnicycleWMR::Robot>(robot));
 	}
 	catch (std::bad_alloc)
 	{
@@ -102,11 +100,11 @@ void RobotSimulation::AddRobot(UnicycleRobot* robot, RobotController* controller
 	}
 }
 
-void RobotSimulation::AddObstacle(RoundObstacle* obstacle)
+void RobotSimulation::AddObstacle(Obstacle* obstacle)
 {
 	try
 	{
-		obstacles.push_back(std::unique_ptr<RoundObstacle>(obstacle));
+		obstacles.push_back(unique_ptr<Obstacle>(obstacle));
 	}
 	catch (std::bad_alloc)
 	{
@@ -116,17 +114,17 @@ void RobotSimulation::AddObstacle(RoundObstacle* obstacle)
 
 void RobotSimulation::SimStep(double dT)
 {
-	for (auto i{ robotCtrlMap.begin() }; i != robotCtrlMap.end(); ++i)
+	for (auto i{ robots.begin() }; i != robots.end(); ++i)
 	{
-		(i->first)->SimStep(dT);
+		(* i)->model.SimStep(dT);
 	}
 }
 
 void RobotSimulation::ControlStep()
 {
-	for (auto i{ robotCtrlMap.begin() }; i != robotCtrlMap.end(); ++i)
+	for (auto i{ robots.begin() }; i != robots.end(); ++i)
 	{
-		(i->second)->ManualControl(*(i->first));
+		(*i)->controller->ManualControl((*i)->model);
 	}
 }
 
@@ -160,7 +158,7 @@ void RobotSimulation::StopControl()
 
 void RobotSimulation::CleanUp()
 {
-	robotCtrlMap.clear();
+	robots.clear();
 }
 
 

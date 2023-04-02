@@ -409,12 +409,11 @@ int WinSim(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCm
 
 int Sim2D(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-	UnicycleRobot* robot = new UnicycleRobot{};
-	RobotController* controller = new RobotController{};
+	UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{};
 	Robot2DModel* model = new Robot2DModel{ *robot };
 	Simulation2D simWin{};
 	//Simulation2D* simWin = new Simulation2D{};
-	simWin.AddRobot(robot, model, controller);
+	simWin.AddRobot(robot, model);
 	simWin.StartSimulation();
 	simWin.MessageLoop(hInstance, hPrevInstance, pCmdLine, nCmdShow);
 
@@ -423,12 +422,11 @@ int Sim2D(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmd
 
 int Sim2D()
 {
-	UnicycleRobot* robot = new UnicycleRobot{};
-	RobotController* controller = new RobotController{};
+	UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{};
 	Robot2DModel* model = new Robot2DModel{ *robot };
 	Simulation2D simWin{};
 	//Simulation2D* simWin = new Simulation2D{};
-	simWin.AddRobot(robot, model, controller);
+	simWin.AddRobot(robot, model);
 	simWin.StartSimulation();
 	simWin.MessageLoop();
 
@@ -517,55 +515,66 @@ LRESULT WinSim2D::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 }
 
-void Robot2DModel::updateParameters(UnicycleRobot& robot)
+void Robot2DModel::updateParameters(UnicycleWMR::Robot& robot)
 {
-	std::vector<double> state = robot.State();
-	std::vector<double> relCenterRotation = robot.relCenterRotation;
+	auto state = robot.model.State();
 
 	// State
-	absCenterOfRotation.x = state[0];
-	absCenterOfRotation.y = state[1];
-	rotation = 180 / S_PI * state[2];
+	absCenterOfRotation(0) = state(0);
+	absCenterOfRotation(1) = state(1);
+	rotation = 180 / S_PI * state(2);
 
 	// Dimensions
-	wheelWidth = (robot.collisionWidth - robot.wheelDist);
+	collisionWidth = robot.model.rectCollisionLeft + robot.model.rectCollisionRight;
+	collisionLength = robot.model.rectCollisionFront + robot.model.rectCollisionBack;
+	wheelWidth = collisionWidth - robot.model.wheelDist;
 	wheelLength = wheelWidth * 3;
-	bodyWidth = (robot.wheelDist - wheelWidth);
-	bodyLength = (robot.collisionHeight * 0.95);
-	relBodyOffset.x = relCenterRotation[0];
-	relBodyOffset.y = (relCenterRotation[1] + wheelWidth);
-	relLeftWheelOffset.x = -wheelLength / 2;
-	relLeftWheelOffset.y = relCenterRotation[1];
-	relRightWheelOffset.x = -wheelLength / 2;
-	relRightWheelOffset.y = (- relCenterRotation[1] - wheelWidth);
+	bodyWidth = robot.model.wheelDist - wheelWidth;
+	bodyLength = collisionLength * 0.95;
+	relBodyOffset(0) = -robot.model.centerOffsetX - robot.model.rectCollisionBack;
+	relBodyOffset(1) = robot.model.centerOffsetY - robot.model.rectCollisionLeft + wheelWidth;
+	relLeftWheelOffset(0) = -robot.model.centerOffsetX - wheelLength / 2;
+	relLeftWheelOffset(1) = robot.model.centerOffsetY - robot.model.rectCollisionLeft;
+	relRightWheelOffset(0) = -robot.model.centerOffsetX - wheelLength / 2;
+	relRightWheelOffset(1) = robot.model.centerOffsetY + robot.model.rectCollisionLeft - wheelWidth;
+
 
 	_Scale(scale);
 
 	float left, top, right, bottom;
 
+	// CollisionRect
+	collisionRect.left = absCenterOfRotation(0) + relBodyOffset(0);
+	collisionRect.top = absCenterOfRotation(1) + relBodyOffset(1) - wheelWidth;
+	collisionRect.right = collisionRect.left + collisionLength;
+	collisionRect.bottom = collisionRect.top + collisionWidth;
+
 	// Body
-	left = absCenterOfRotation.x + relBodyOffset.x;
-	top = absCenterOfRotation.y + relBodyOffset.y;
+	left = absCenterOfRotation(0) + relBodyOffset(0);
+	top = absCenterOfRotation(1) + relBodyOffset(1);
 	right = left + bodyLength;
 	bottom = top + bodyWidth;
-	body.reset(new ColorRectangle(left, top, right, bottom, rotation, relBodyOffset, D2D1::ColorF(D2D1::ColorF::Beige)));
+	D2D1_POINT_2F bodyOffset{ relBodyOffset(0) , relBodyOffset(1) };
+	body.reset(new ColorRectangle(left, top, right, bottom, rotation, bodyOffset, color));
 
 	// Left wheel
-	left = absCenterOfRotation.x + relLeftWheelOffset.x;
-	top = absCenterOfRotation.y + relLeftWheelOffset.y;
+	left = absCenterOfRotation(0) + relLeftWheelOffset(0);
+	top = absCenterOfRotation(1) + relLeftWheelOffset(1);
 	right = left + wheelLength;
 	bottom = top + wheelWidth;
-	leftWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, relLeftWheelOffset, D2D1::ColorF(D2D1::ColorF::Black)));
+	D2D1_POINT_2F leftOffset{ relLeftWheelOffset(0) , relLeftWheelOffset(1) };
+	leftWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, leftOffset, D2D1::ColorF(D2D1::ColorF::Black)));
 
 	// Right wheel
-	left = absCenterOfRotation.x + relRightWheelOffset.x;
-	top = absCenterOfRotation.y + relRightWheelOffset.y;
+	left = absCenterOfRotation(0) + relRightWheelOffset(0);
+	top = absCenterOfRotation(1) + relRightWheelOffset(1);
 	right = left + wheelLength;
 	bottom = top + wheelWidth;
-	rightWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, relRightWheelOffset, D2D1::ColorF(D2D1::ColorF::Black)));
+	D2D1_POINT_2F reightOffset{ relRightWheelOffset(0) , relRightWheelOffset(1) };
+	rightWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, reightOffset, D2D1::ColorF(D2D1::ColorF::Black)));
 }
 
-Robot2DModel::Robot2DModel(UnicycleRobot& robot)
+Robot2DModel::Robot2DModel(UnicycleWMR::Robot& robot)
 {
 	// Robot
 	updateParameters(robot);
@@ -573,105 +582,101 @@ Robot2DModel::Robot2DModel(UnicycleRobot& robot)
 
 Robot2DModel::Robot2DModel(D2D1_POINT_2F cursorPos, D2D1_COLOR_F color)
 {
-	UnicycleRobot robot{ std::vector<double>{cursorPos.x, cursorPos.y, 0} };
+	UnicycleWMR::Robot robot{ Eigen::Vector3d{cursorPos.x, cursorPos.y, 0} };
 	updateParameters(robot);
 	body->SetColor(color);
 }
 
 void Robot2DModel::Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush)
 {
+	pRenderTarget->SetTransform(D2D1::Matrix3x2F::Rotation(rotation, D2D1_POINT_2F{ (float)absCenterOfRotation(0),(float)absCenterOfRotation(1) }));
+	pBrush->SetColor(color);
+	//pRenderTarget->FillRectangle(collisionRect, pBrush);
+	pBrush->SetColor(D2D1::ColorF(D2D1::ColorF::BlueViolet));
+	pRenderTarget->DrawRectangle(collisionRect, pBrush, 1.0f);
+	pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
 	if (body) body->Draw(pRenderTarget, pBrush);
 	if (leftWheel) leftWheel->Draw(pRenderTarget, pBrush);
 	if (rightWheel) rightWheel->Draw(pRenderTarget, pBrush);
 }
 
-void Robot2DModel::Move(FLOAT deltaX, FLOAT deltaY, FLOAT rotation)
+void Robot2DModel::Update(UnicycleWMR::Robot& robot)
 {
-	if (body) body->Move(deltaX, deltaY, rotation);
-	if (leftWheel) leftWheel->Move(deltaX, deltaY, rotation);
-	if (rightWheel) rightWheel->Move(deltaX, deltaY, rotation);
-}
-
-void Robot2DModel::UpdateRectangles(D2D1_POINT_2F position, FLOAT rotation)
-{
-	if (body) body->UpdateRectangle(position, rotation);
-	if (leftWheel) leftWheel->UpdateRectangle(position, rotation);
-	if (rightWheel) rightWheel->UpdateRectangle(position, rotation);
-}
-
-void Robot2DModel::UpdateState(UnicycleRobot& robot)
-{
-	std::vector<double> state = robot.State();
-	std::vector<double> relCenterRotation = robot.relCenterRotation;
+	auto state = robot.model.State();
 
 	// State
-	absCenterOfRotation.x = state[0];
-	absCenterOfRotation.y = state[1];
-	rotation = 180 / S_PI * state[2];
+	absCenterOfRotation(0) = state(0);
+	absCenterOfRotation(1) = state(1);
+	rotation = 180 / S_PI * state(2);
 
 	float left, top, right, bottom;
 
+	// CollisionRect
+	collisionRect.left = absCenterOfRotation(0) + relBodyOffset(0);
+	collisionRect.top = absCenterOfRotation(1) + relBodyOffset(1) - wheelWidth;
+	collisionRect.right = collisionRect.left + collisionLength;
+	collisionRect.bottom = collisionRect.top + collisionWidth;
+
 	// Body
-	left = absCenterOfRotation.x + relBodyOffset.x;
-	top = absCenterOfRotation.y + relBodyOffset.y;
+	left = absCenterOfRotation(0) + relBodyOffset(0);
+	top = absCenterOfRotation(1) + relBodyOffset(1);
 	right = left + bodyLength;
 	bottom = top + bodyWidth;
-	body.reset(new ColorRectangle(left, top, right, bottom, rotation, relBodyOffset, D2D1::ColorF(D2D1::ColorF::Beige)));
+	D2D1_POINT_2F bodyOffset{ relBodyOffset(0) , relBodyOffset(1) };
+	body.reset(new ColorRectangle(left, top, right, bottom, rotation, bodyOffset, color));
 
 	// Left wheel
-	left = absCenterOfRotation.x + relLeftWheelOffset.x;
-	top = absCenterOfRotation.y + relLeftWheelOffset.y;
+	left = absCenterOfRotation(0) + relLeftWheelOffset(0);
+	top = absCenterOfRotation(1) + relLeftWheelOffset(1);
 	right = left + wheelLength;
 	bottom = top + wheelWidth;
-	leftWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, relLeftWheelOffset, D2D1::ColorF(D2D1::ColorF::Black)));
+	D2D1_POINT_2F leftOffset{ relLeftWheelOffset(0) , relLeftWheelOffset(1) };
+	leftWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, leftOffset, D2D1::ColorF(D2D1::ColorF::Black)));
 
 	// Right wheel
-	left = absCenterOfRotation.x + relRightWheelOffset.x;
-	top = absCenterOfRotation.y + relRightWheelOffset.y;
+	left = absCenterOfRotation(0) + relRightWheelOffset(0);
+	top = absCenterOfRotation(1) + relRightWheelOffset(1);
 	right = left + wheelLength;
 	bottom = top + wheelWidth;
-	rightWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, relRightWheelOffset, D2D1::ColorF(D2D1::ColorF::Black)));
+	D2D1_POINT_2F reightOffset{ relRightWheelOffset(0) , relRightWheelOffset(1) };
+	rightWheel.reset(new ColorRectangle(left, top, right, bottom, rotation, reightOffset, D2D1::ColorF(D2D1::ColorF::Black)));
 
 }
 
-void Robot2DModel::Scale(UnicycleRobot& robot, float scale)
+void Robot2DModel::Scale(UnicycleWMR::Robot& robot, float scale)
 {
 	this->scale = scale;
-	std::vector<double> relCenterRotation = robot.relCenterRotation;
 	// Dimensions
-	wheelWidth = (robot.collisionWidth - robot.wheelDist);
+	collisionWidth = robot.model.rectCollisionLeft + robot.model.rectCollisionRight;
+	collisionLength = robot.model.rectCollisionFront + robot.model.rectCollisionBack;
+	wheelWidth = collisionWidth - robot.model.wheelDist;
 	wheelLength = wheelWidth * 3;
-	bodyWidth = (robot.wheelDist - wheelWidth);
-	bodyLength = (robot.collisionHeight * 0.95);
-	relBodyOffset.x = relCenterRotation[0];
-	relBodyOffset.y = (relCenterRotation[1] + wheelWidth);
-	relLeftWheelOffset.x = -wheelLength / 2;
-	relLeftWheelOffset.y = relCenterRotation[1];
-	relRightWheelOffset.x = -wheelLength / 2;
-	relRightWheelOffset.y = (-relCenterRotation[1] - wheelWidth);
+	bodyWidth = robot.model.wheelDist - wheelWidth;
+	bodyLength = collisionLength * 0.95;
+	relBodyOffset(0) = -robot.model.centerOffsetX - robot.model.rectCollisionBack;
+	relBodyOffset(1) = robot.model.centerOffsetY - robot.model.rectCollisionLeft + wheelWidth;
+	relLeftWheelOffset(0) = -robot.model.centerOffsetX - wheelLength / 2;
+	relLeftWheelOffset(1) = robot.model.centerOffsetY - robot.model.rectCollisionLeft;
+	relRightWheelOffset(0) = -robot.model.centerOffsetX - wheelLength / 2;
+	relRightWheelOffset(1) = robot.model.centerOffsetY + robot.model.rectCollisionLeft - wheelWidth;
 
 	_Scale(scale);
 }
 
 void Robot2DModel::_Scale(float scale)
 {
+	collisionWidth *= scale;
+	collisionLength *= scale;
 	wheelWidth *= scale;
 	wheelLength *= scale; 
 	bodyWidth *= scale; 
 	bodyLength *= scale; 
-	relBodyOffset.x *= scale; 
-	relBodyOffset.y *= scale; 
-	relLeftWheelOffset.x *= scale; 
-	relLeftWheelOffset.y *= scale; 
-	relRightWheelOffset.x *= scale; 
-	relRightWheelOffset.y *= scale;
-}
-
-void Robot2DModel::AddRotation(float rotation)
-{
-	body->Rotation() += rotation;
-	leftWheel->Rotation() += rotation;
-	rightWheel->Rotation() += rotation;
+	relBodyOffset(0) *= scale; 
+	relBodyOffset(1) *= scale; 
+	relLeftWheelOffset(0) *= scale; 
+	relLeftWheelOffset(1) *= scale; 
+	relRightWheelOffset(0) *= scale; 
+	relRightWheelOffset(1) *= scale;
 }
 
 BOOL Robot2DModel::HitTest(float dipX, float dipY)
@@ -684,6 +689,142 @@ BOOL Robot2DModel::HitTest(float dipX, float dipY)
 		}
 	}
 	return FALSE;
+}
+
+void Rotate2DVector(Eigen::Vector2d& vector, double rotation)
+{
+	Eigen::Matrix2d rotationMatrix;
+	rotationMatrix << cos(rotation * S_PI / 180.0), -sin(rotation * S_PI / 180.0),
+		sin(rotation * S_PI / 180.0), cos(rotation * S_PI / 180.0);
+	vector = rotationMatrix * vector;
+}
+
+BOOL Robot2DModel::CheckCollision(Robot2DModel& model)
+{
+	// Source model
+	Eigen::Vector2d centerSource = absCenterOfRotation;
+
+	// Target model
+	Eigen::Vector2d centerTarget = model.absCenterOfRotation;
+	Eigen::Vector2d topLeftTarget{ {model.collisionRect.left, model.collisionRect.top}};
+	Eigen::Vector2d topRightTarget{ {model.collisionRect.right, model.collisionRect.top} };
+	Eigen::Vector2d bottomLeftTarget{ {model.collisionRect.left, model.collisionRect.bottom} };
+	Eigen::Vector2d bottomRightTarget{ {model.collisionRect.right, model.collisionRect.bottom} };
+	topLeftTarget -= centerTarget;
+	topRightTarget -= centerTarget;
+	bottomLeftTarget -= centerTarget;
+	bottomRightTarget -= centerTarget;
+	Rotate2DVector(topLeftTarget, model.rotation);
+	Rotate2DVector(topRightTarget, model.rotation);
+	Rotate2DVector(bottomLeftTarget, model.rotation);
+	Rotate2DVector(bottomRightTarget, model.rotation);
+	topLeftTarget += centerTarget;
+	topRightTarget += centerTarget;
+	bottomLeftTarget += centerTarget;
+	bottomRightTarget += centerTarget;
+
+	if (HitTest(topLeftTarget(0), topLeftTarget(1)) || HitTest(topRightTarget(0), topRightTarget(1))
+		|| HitTest(bottomLeftTarget(0), bottomLeftTarget(1)) || HitTest(bottomRightTarget(0), bottomRightTarget(1)))
+	{
+		return TRUE;
+	}
+	return FALSE;
+}
+
+double DistanceToLine2D(Eigen::Vector2d point1, Eigen::Vector2d point2, Eigen::Vector2d p0)
+{
+	double length = std::sqrt(std::pow(point2(0) - point1(0), 2.0) + std::pow(point2(1) - point1(1), 2.0));
+	return abs((point2(0)-point1(0))*(point1(1)-p0(1)) - (point1(0)-p0(0))*(point2(1)-point1(1))) / length;
+}
+
+Eigen::Vector2d VectorToLine2D(Eigen::Vector2d point1, Eigen::Vector2d point2, Eigen::Vector2d p0)
+{
+	Eigen::Vector2d n = (point2 - point1).normalized();
+	return (point1 - p0) - ((point1 - p0).dot(n)) * n;
+}
+
+BOOL CheckBetween(Eigen::Vector2d point1, Eigen::Vector2d point2, Eigen::Vector2d p0)
+{
+	return ((point1(0) < point2(0)) ? (p0(0) >= point1(0) && p0(0) <= point2(0)) : (p0(0) >= point2(0) && p0(0) <= point1(0))) &&
+		((point1(1) < point2(1)) ? (p0(1) >= point1(1) && p0(1) <= point2(1)) : (p0(1) >= point2(1) && p0(1) <= point1(1)));
+}
+
+BOOL Robot2DModel::CheckCollision(ObstacleModel& model)
+{
+	Eigen::Vector2d centerTarget = absCenterOfRotation;
+	Eigen::Vector2d topLeftTarget{ {collisionRect.left, collisionRect.top} };
+	Eigen::Vector2d topRightTarget{ {collisionRect.right, collisionRect.top} };
+	Eigen::Vector2d bottomLeftTarget{ {collisionRect.left, collisionRect.bottom} };
+	Eigen::Vector2d bottomRightTarget{ {collisionRect.right, collisionRect.bottom} };
+	topLeftTarget -= centerTarget;
+	topRightTarget -= centerTarget;
+	bottomLeftTarget -= centerTarget;
+	bottomRightTarget -= centerTarget;
+	Rotate2DVector(topLeftTarget, rotation);
+	Rotate2DVector(topRightTarget, rotation);
+	Rotate2DVector(bottomLeftTarget, rotation);
+	Rotate2DVector(bottomRightTarget, rotation);
+	topLeftTarget += centerTarget;
+	topRightTarget += centerTarget;
+	bottomLeftTarget += centerTarget;
+	bottomRightTarget += centerTarget;
+	if (model.Ellipse())
+	{
+		Eigen::Vector2d center{ { model.Ellipse()->Shape().point.x, model.Ellipse()->Shape().point.y} };
+		Eigen::Vector2d vector;
+
+		if ((topLeftTarget - center).norm() <= model.Ellipse()->Shape().radiusX)
+		{
+			return TRUE;
+		}
+		if ((topRightTarget - center).norm() <= model.Ellipse()->Shape().radiusX)
+		{
+			return TRUE;
+		}
+		if ((bottomLeftTarget - center).norm() <= model.Ellipse()->Shape().radiusX)
+		{
+			return TRUE;
+		}
+		if ((bottomRightTarget - center).norm() <= model.Ellipse()->Shape().radiusX)
+		{
+			return TRUE;
+		}
+
+		vector = VectorToLine2D(topLeftTarget, topRightTarget, center);
+		if (vector.norm() <= model.Ellipse()->Shape().radiusX && CheckBetween(topLeftTarget, topRightTarget, center + vector))
+			return TRUE;
+		vector = VectorToLine2D(topRightTarget, bottomRightTarget, center);
+		if (vector.norm() <= model.Ellipse()->Shape().radiusX && CheckBetween(topRightTarget, bottomRightTarget, center + vector))
+			return TRUE;
+		vector = VectorToLine2D(bottomRightTarget, bottomLeftTarget, center);
+		if (vector.norm() <= model.Ellipse()->Shape().radiusX && CheckBetween(bottomRightTarget, bottomLeftTarget, center + vector))
+			return TRUE;
+		vector = VectorToLine2D(bottomLeftTarget, topLeftTarget, center);
+		if (vector.norm() <= model.Ellipse()->Shape().radiusX && CheckBetween(bottomLeftTarget, topLeftTarget, center + vector))
+			return TRUE;
+
+		//if (DistanceToLine2D(topLeftTarget, topRightTarget, center) <= model.Ellipse()->Shape().radiusX ||
+		//	DistanceToLine2D(topRightTarget, bottomRightTarget, center) <= model.Ellipse()->Shape().radiusX ||
+		//	DistanceToLine2D(bottomRightTarget, bottomLeftTarget, center) <= model.Ellipse()->Shape().radiusX ||
+		//	DistanceToLine2D(bottomLeftTarget, topLeftTarget, center) <= model.Ellipse()->Shape().radiusX)
+		//{
+		//	return TRUE;
+		//}
+	}
+	else if (model.Rectangle())
+	{
+
+	}
+	return FALSE;
+}
+
+void Robot2DModel::SetColor(D2D1_COLOR_F color)
+{
+	if (body)
+	{
+		body->SetColor(color);
+		this->color = color;
+	}
 }
 
 HRESULT Simulation2D::CreateGraphicsResources()
@@ -738,12 +879,14 @@ void Simulation2D::OnPaint()
 		pRenderTarget->BeginDraw(); // Start drawing
 		pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::SkyBlue)); // Fill the entire render target with a solid color
 
+		CheckCollision();
+
 		for (auto i = robotModelMap.begin(); i != robotModelMap.end(); ++i)
 		{
-			i->second->UpdateState(*(i->first));
+			i->second->Update(*(i->first));
 			i->second->Draw(pRenderTarget, pBrush);
 		}
-
+		
 		obsModels.Draw(pRenderTarget, pBrush);
 
 		hr = pRenderTarget->EndDraw(); // End drawing (error signal from here)
@@ -763,8 +906,6 @@ void Simulation2D::OnLeftButtonDown(int pixelX, int pixelY, DWORD flags)
 	{
 		POINT pt{ pixelX, pixelY };
 
-		
-		
 		if (DragDetect(Window(), pt))
 		{
 			drawStartPos = mousePos;
@@ -781,13 +922,12 @@ void Simulation2D::OnLeftButtonDown(int pixelX, int pixelY, DWORD flags)
 			}
 			else
 			{
-				std::vector<double> initPos{ drawStartPos.x, drawStartPos.y, 0 };
-				UnicycleRobot* robot = new UnicycleRobot{ initPos };
+				Eigen::Vector3d initPos{ drawStartPos.x, drawStartPos.y, 0 };
+				UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{ initPos };
 				Robot2DModel* model = new Robot2DModel{ *robot };
 				model->Scale(*robot, 0.1);
-				RobotController* controller = new RobotController{};
 				robotModels.InsertShape(drawStartPos.x, drawStartPos.y, model);
-				AddRobot(robot, model, controller);
+				AddRobot(robot, model);
 			}
 		}
 	}
@@ -798,9 +938,9 @@ void Simulation2D::OnLeftButtonDown(int pixelX, int pixelY, DWORD flags)
 		if (robotModels.SelectShape(mousePos.x, mousePos.y))
 		{
 			SetCapture(m_hwnd);
-			UnicycleRobot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
-			dragObjRelPos.x = mousePos.x - robot.State()[0];
-			dragObjRelPos.y = mousePos.y - robot.State()[1];
+			UnicycleWMR::Robot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
+			dragObjRelPos.x = mousePos.x - robot.model.State()(0);
+			dragObjRelPos.y = mousePos.y - robot.model.State()(1);
 		}
 		else if (obsModels.SelectShape(mousePos.x, mousePos.y))
 		{
@@ -839,8 +979,9 @@ void Simulation2D::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 		{
 			if (robotModels.SelectedShape())
 			{
-				UnicycleRobot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
-				const float size = robot.collisionHeight + robot.collisionWidth;
+				UnicycleWMR::Robot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
+				const float size = robot.model.rectCollisionLeft + robot.model.rectCollisionFront 
+					+ robot.model.rectCollisionFront + robot.model.rectCollisionBack;
 				float scale = (abs(dips.x - drawStartPos.x) + abs(dips.y - drawStartPos.y)) / size;
 				scale = scale > 1.0f ? 1.0f : scale;
 				robotModels.SelectedShape()->Scale(robot, scale);
@@ -855,10 +996,10 @@ void Simulation2D::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 		{
 			if (robotModels.SelectedShape())
 			{
-				UnicycleRobot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
-				robot.State()[0] = dips.x - dragObjRelPos.x;
-				robot.State()[1] = dips.y - dragObjRelPos.y;
-				robotModels.SelectedShape()->UpdateState(robot);
+				UnicycleWMR::Robot& robot = *modelRobotMap[robotModels.SelectedShape().get()];
+				robot.model.State()(0) = dips.x - dragObjRelPos.x;
+				robot.model.State()(1) = dips.y - dragObjRelPos.y;
+				robotModels.SelectedShape()->Update(robot);
 			}
 			else if (obsModels.SelectedShape())
 			{
@@ -873,7 +1014,7 @@ void Simulation2D::OnMouseWheel(int delta)
 {
 	if (robotModels.SelectedShape())
 	{
-		modelRobotMap[robotModels.SelectedShape().get()]->State()[2] += static_cast<double>(delta) * S_PI / 180 / 120.0 * 4;
+		modelRobotMap[robotModels.SelectedShape().get()]->model.State()(2) += static_cast<double>(delta) * S_PI / 180 / 120.0 * 4;
 	}
 	else if (obsModels.SelectedShape())
 	{
@@ -907,9 +1048,9 @@ void Simulation2D::SetMode(SimMode mode)
 	}
 }
 
-void Simulation2D::AddRobot(UnicycleRobot* robot, Robot2DModel* model, RobotController* controller)
+void Simulation2D::AddRobot(UnicycleWMR::Robot* robot, Robot2DModel* model)
 {
-	robotSim.AddRobot(robot, controller);
+	robotSim.AddRobot(robot);
 	robotModelMap.insert({ robot, model });
 	modelRobotMap.insert({ model, robot });
 }
@@ -917,6 +1058,33 @@ void Simulation2D::AddRobot(UnicycleRobot* robot, Robot2DModel* model, RobotCont
 void Simulation2D::AddObstacle(RoundObstacle* obstacle)
 {
 	robotSim.AddObstacle(obstacle);
+}
+
+void Simulation2D::CheckCollision()
+{
+	for (auto i{ robotModels.List().begin() }; i != robotModels.List().end(); ++i)
+	{
+		(*i)->SetColor(D2D1::ColorF(D2D1::ColorF::Beige));
+	}
+	for (auto i{ robotModels.List().begin() }; i != robotModels.List().end(); ++i)
+	{
+		for (auto j{ std::next(i,1) }; j != robotModels.List().end(); ++j)
+		{
+			if ((*i)->CheckCollision(*(*j)) || (*j)->CheckCollision(*(*i)))
+			{
+				(*i)->SetColor(D2D1::ColorF(D2D1::ColorF::Red));
+				(*j)->SetColor(D2D1::ColorF(D2D1::ColorF::Red));
+			}
+		}
+
+		for (auto k{ obsModels.List().begin() }; k != obsModels.List().end(); ++k)
+		{
+			if ((*i)->CheckCollision(*(*k)))
+			{
+				(*i)->SetColor(D2D1::ColorF(D2D1::ColorF::Red));
+			}
+		}
+	}
 }
 
 void Simulation2D::MessageLoop(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -1167,4 +1335,9 @@ BOOL ObstacleModel::HitTest(float dipX, float dipY)
 		if (rectangle->HitTest(dipX, dipY)) return TRUE;
 	}
 	return FALSE;
+}
+
+BOOL ObstacleModel::CheckCollision(IModel& model)
+{
+	return 0;
 }

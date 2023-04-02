@@ -135,6 +135,7 @@ public:
 	void ClearSelection() { pShape = nullptr; }
 	const D2D1::ColorF& Color() const { return D2D1::ColorF(colors[colorIndex]); }
 	void Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush);
+	const std::list<std::unique_ptr<Shape>>& List() const { return shapes; };
 };
 
 enum class Mode

@@ -10,6 +10,7 @@
 #include <d2d1.h>
 #include <mutex>
 #include <iostream>
+#include "wmr.h"
 
 class Timer
 {
@@ -95,20 +96,37 @@ public:
 	// }
 };
 
-struct RoundObstacle
+struct Obstacle
 {
-	double radius = 50;
 	double xPos = 0;
 	double yPos = 0;
+	double rotation = 0;
+
+	Obstacle() = default;
+	Obstacle(double xPos, double yPose, double rotation) : xPos{ xPos }, yPos{ yPos }, rotation{ rotation } {}
+};
+
+struct RoundObstacle: public Obstacle
+{
+	double radius = 50;
+
+	RoundObstacle() = default;
+	RoundObstacle(double xPos, double yPos, double rotation, double radius) : Obstacle(xPos, yPos, rotation), radius{ radius } {}
 };
 
 
-struct RectObstacle
+struct RectObstacle: public Obstacle
 {
 	double width = 100;
 	double height = 100;
-	double xPos = 0;
-	double yPos = 0;
+	double left;
+	double top;
+	double right;
+	double bottom;
+
+	RectObstacle() = default;
+	RectObstacle(double left, double top, double right, double bottom, double rotation) : left{ left }, top{ top }, right{ right }, bottom{ bottom }, 
+		width{ abs(right - left) }, height{ abs(top - bottom) }, Obstacle(left, top, rotation) {}
 };
 
 
@@ -126,6 +144,9 @@ public:
 };
 
 
+using std::vector;
+using std::unique_ptr;
+
 class RobotSimulation
 {
 private:
@@ -141,15 +162,13 @@ private:
 
 public:
 	// Simulation state
-	std::vector<std::unique_ptr<RoundObstacle>> obstacles;
-	std::vector<std::unique_ptr<UnicycleRobot>> robots;
-	std::vector <std::unique_ptr<RobotController>> controllers;
-	std::map<UnicycleRobot*, RobotController*> robotCtrlMap;
+	vector<unique_ptr<UnicycleWMR::Robot>> robots;
+	vector<unique_ptr<Obstacle>> obstacles;
 
-	RobotSimulation(int winWidth = 640, int winHeight = 480, int simInterval = 10, int ctrlInterval = 20)
+	RobotSimulation(int winWidth = 1920, int winHeight = 1080, int simInterval = 10, int ctrlInterval = 20)
 		:winWidth{ winWidth }, winHeight{ winHeight }, simTimer{ simInterval }, ctrlTimer{ ctrlInterval } {}
-	void AddRobot(UnicycleRobot* robot, RobotController* controller);
-	void AddObstacle(RoundObstacle* obstacle);
+	void AddRobot(UnicycleWMR::Robot* robot);
+	void AddObstacle(Obstacle* obstacle);
 	void SimStep(double dT);
 	void ControlStep();
 	void StartSim();

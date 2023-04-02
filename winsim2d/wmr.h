@@ -5,9 +5,12 @@
 #include <unsupported/Eigen/Splines>
 #include <mutex>
 #include <vector>
+#include <d2d1.h>
+
 
 namespace UnicycleWMR
 {
+	
 	// Two-wheeled differential mobile robot
 
 	using Eigen::Matrix;
@@ -28,24 +31,24 @@ namespace UnicycleWMR
 		double velocityRight = 0;
 		double time = 0;
 		double maxSpeed = 200;					// DIP per sec
-
-		// Geometric parameters
-		double wheelDist = 70;
-		double centerOffsetX = 0;
-		double centerOffsetY = 0;
-		double rectCollisionLeft = 40;
-		double rectCollisionTop = 40;
-		double rectCollisionRight = 40;
-		double rectCollisionBottom = 110;
 		
 		// MISC
 		std::mutex lock{};
 
 	public:
+		// Geometric parameters
+		double wheelDist = 70;
+		double centerOffsetX = 0;
+		double centerOffsetY = 0;
+		double rectCollisionLeft = 40;
+		double rectCollisionFront = 110;
+		double rectCollisionRight = 40;
+		double rectCollisionBack = 40;
+
 		Model(Vector3d initState = { 300, 100, 50 }, double maxSpeed = 200, double wheelDist = 70, double centerOffsetX = 0, double centerOffsetY = 0,
-			double rectCollisionLeft = 40, double rectCollisionTop = 40, double rectCollisionRight = 40, double rectCollisionBottom = 110)
+			double rectCollisionLeft = 40, double rectCollisionFront = 110, double rectCollisionRight = 40, double rectCollisionBack = 40)
 			:genState{ initState }, maxSpeed{ maxSpeed }, wheelDist{ wheelDist }, centerOffsetX{ centerOffsetX }, centerOffsetY{ centerOffsetY },
-			rectCollisionLeft{ rectCollisionLeft }, rectCollisionTop{ rectCollisionTop }, rectCollisionRight{ rectCollisionRight }, rectCollisionBottom{ rectCollisionBottom } {}
+			rectCollisionLeft{ rectCollisionLeft }, rectCollisionFront{ rectCollisionFront }, rectCollisionRight{ rectCollisionRight }, rectCollisionBack{ rectCollisionBack } {}
 		void SetMaxSpeed(double speed) { maxSpeed = abs(speed); }
 		const Vector3d& State() const { return genState; }
 		Vector3d& State() { return genState; }
@@ -76,13 +79,26 @@ namespace UnicycleWMR
 
 	class Controller
 	{
+	#define KEY(c) ( GetAsyncKeyState((int)(c)) & (SHORT)0x8000 )
+	private:
+		// Manual ctrl params
 
+	public:
+		// Interface
+		Controller() = default;
+		void ManualControl(UnicycleWMR::Model& robot, float speed = 100.0f);
 	};
 
 	struct Robot
 	{
 		Model model;
-		
+		PathPlanner* pathPlanner;
+		Controller* controller;
+
+		Robot(Vector3d initState = { 300, 100, 50 }, double maxSpeed = 200, double wheelDist = 70, double centerOffsetX = 0, double centerOffsetY = 0,
+			double rectCollisionLeft = 40, double rectCollisionFront = 110, double rectCollisionRight = 40, double rectCollisionBack = 20)
+			:model{ initState, maxSpeed, wheelDist, centerOffsetX, centerOffsetY, rectCollisionLeft, rectCollisionFront, rectCollisionRight, rectCollisionBack }, 
+			pathPlanner{}, controller{} {}
 	};
 }
 

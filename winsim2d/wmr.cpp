@@ -40,3 +40,26 @@ UnicycleWMR::Path::Path(double xInit, double xEnd, vector<Vector2d>(*pathGenerat
 {
 	pathPoints = pathGenerator(xInit, xEnd);
 }
+
+void UnicycleWMR::Controller::ManualControl(UnicycleWMR::Model& robot, float speed)
+{
+	double vl = 0, vr = 0;
+	const double w_max = 2 * speed / robot.wheelDist;
+	if (KEY('I')) {
+		vl = speed;
+		vr = speed;
+	}
+	else if (KEY('K')) {
+		vl = -speed;
+		vr = -speed;
+	}
+	else if (KEY('J')) {
+		vl = speed;
+		vr = -speed;
+	}
+	else if (KEY('L')) {
+		vl = -speed;
+		vr = speed;
+	}
+	robot.SetCtrlInput(vl, vr);
+}
