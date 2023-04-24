@@ -1,6 +1,8 @@
 #ifndef UNICYCLE_SIM_H
 #define UNICYCLE_SIM_H
 
+
+#include "wmr.h"
 #include <vector>
 #include <memory>
 #include <chrono>
@@ -10,7 +12,7 @@
 #include <d2d1.h>
 #include <mutex>
 #include <iostream>
-#include "wmr.h"
+
 
 class Timer
 {
@@ -114,7 +116,6 @@ struct RoundObstacle: public Obstacle
 	RoundObstacle(double xPos, double yPos, double rotation, double radius) : Obstacle(xPos, yPos, rotation), radius{ radius } {}
 };
 
-
 struct RectObstacle: public Obstacle
 {
 	double width = 100;
@@ -129,7 +130,6 @@ struct RectObstacle: public Obstacle
 		width{ abs(right - left) }, height{ abs(top - bottom) }, Obstacle(left, top, rotation) {}
 };
 
-
 class RobotController
 {
 #define KEY(c) ( GetAsyncKeyState((int)(c)) & (SHORT)0x8000 )
@@ -142,7 +142,6 @@ public:
 	void ManualControl(UnicycleRobot& robot, float speed = 100.0f);
 	void AutoControl(UnicycleRobot& robot, float vl = 0.1, float vr = 0.1);
 };
-
 
 using std::vector;
 using std::unique_ptr;
@@ -177,8 +176,5 @@ public:
 	void StopControl();
 	void CleanUp();
 };
-
-
-
 
 #endif

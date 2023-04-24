@@ -1,13 +1,11 @@
 #ifndef WINSIM2D_H
 #define WINSIM2D_H
 
-#include "drawing_window.h"
 #include "unicycle_sim.h"
+#include "drawing_window.h"
 #include <map>
 #include <dwrite.h>
 #include <iterator>
-
-
 
 class GDIBmp : public Bmp
 {
@@ -178,11 +176,51 @@ public:
 	const D2D1_COLOR_F& GetColor() const { return color; }
 };
 
+using namespace boost;
+using Eigen::Vector2d;
+using Eigen::Vector3d;
+using Eigen::seq;
+using std::list;
+using std::vector;
+using std::pair;
+using std::tie;
+
+class TreeModel : public IModel
+{
+
+private:
+	RRT::Tree* tree;
+	D2D1_COLOR_F color{ D2D1::ColorF(D2D1::ColorF::Blue) };
+
+public:
+	TreeModel(RRT::Tree* tree);
+	void Reset(RRT::Tree* tree);
+	TreeModel(D2D1_POINT_2F cursorPosition, D2D1_COLOR_F color) {}
+	void Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush);
+	void SetColor(D2D1_COLOR_F color);
+	BOOL HitTest(float dipX, float dipY) { return TRUE; }
+};
+
+class CurveModel : public IModel
+{
+private:
+	RRT::ParametricCurve2D* curve;
+	D2D1_COLOR_F color{ D2D1::ColorF(D2D1::ColorF::Green) };
+
+public:
+	CurveModel(RRT::ParametricCurve2D* curve) : curve{ curve } {}
+	void Reset(RRT::ParametricCurve2D* curve) { this->curve = curve; }
+	CurveModel(D2D1_POINT_2F cursorPosition, D2D1_COLOR_F color) {}
+	void Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush);
+	void SetColor(D2D1_COLOR_F color) { this->color = color; }
+	BOOL HitTest(float dipX, float dipY) { return TRUE; }
+};
+
 enum class SimMode
 {
 	Create,
 	Edit,
-	Simulation
+	Simulation,
 };
 
 class Simulation2D: public BasicWindow<Simulation2D>
@@ -214,6 +252,7 @@ protected:
 	HCURSOR hCursor;
 	SimMode mode;
 	void SetMode(SimMode mode);
+	bool controlFlag = false;
 
 	//Timers
 	Timer simTimer;
@@ -231,19 +270,27 @@ public:
 	RobotSimulation robotSim;
 	ShapeList<Robot2DModel> robotModels;
 	ShapeList<ObstacleModel> obsModels;
+	ShapeList<TreeModel> treeModels;
+	ShapeList<CurveModel> curveModels;
 	std::map<UnicycleWMR::Robot*, Robot2DModel*> robotModelMap;
 	std::map<Robot2DModel*, UnicycleWMR::Robot*> modelRobotMap;
+	std::map<UnicycleWMR::Robot*, TreeModel*> robotTreeMap;
+	std::map<UnicycleWMR::Robot*, CurveModel*> robotCurveMap;
 
 	// Interface
-	Simulation2D(int simInterval = 10, int ctrlInterval = 20) : pFactory{ NULL }, pRenderTarget{ NULL }, pBrush{ NULL },
+	Simulation2D(int simInterval = 5, int ctrlInterval = 20) : pFactory{ NULL }, pRenderTarget{ NULL }, pBrush{ NULL },
 		robotSim{}, simTimer{ simInterval }, ctrlTimer{ ctrlInterval } {}
 	void AddRobot(UnicycleWMR::Robot* robot, Robot2DModel* model);
 	void AddObstacle(RoundObstacle* obstacle);
+	void AddTree(TreeModel* tree);
+	void AddCurve(CurveModel* curve);
 	void CheckCollision();
 	void MessageLoop(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow);
 	void MessageLoop();
 	void StartSimulation();
 	void StopSimulation();
+	void StartControl();
+	void StopControl();
 	void CleanUp();
 	//void SafeRelease();
 

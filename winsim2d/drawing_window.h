@@ -88,7 +88,7 @@ private:
 	D2D1_POINT_2F originPosition{ 0,0 };	// position of center of rotation in abs frame
 	D2D1_POINT_2F relCornerOffset{ 0,0 };		// Upper-left corner to bottom-right corner
 	D2D1_POINT_2F absCornerOffset{ 0,0 };
-	float rotation = 0; // degrees
+	float rotation = 0; // degree
 public:
 	ColorRectangle() = default;
 	ColorRectangle(FLOAT left, FLOAT top, FLOAT right, FLOAT bottom, FLOAT rotation, 
@@ -107,6 +107,7 @@ public:
 	void UpdateRectangle(D2D1_POINT_2F absPosition, float rotation);
 	void Update(D2D1_POINT_2F relCornerCenterOffset);
 	void UpdateState(D2D1_POINT_2F topLeft, float rotation);
+	const D2D1_POINT_2F& Origin() const { return originPosition; }
 };
 
 D2D1_POINT_2F Rotate2D(const D2D1_POINT_2F& vector, float rotation);

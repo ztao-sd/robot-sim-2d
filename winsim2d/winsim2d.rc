@@ -52,12 +52,13 @@ END
 
 IDR_ACCELERATOR1 ACCELERATORS
 BEGIN
-    VK_F1,          ID_DRAW_MODE,           VIRTKEY, NOINVERT
-    VK_F2,          ID_SELECT_MODE,         VIRTKEY, NOINVERT
-    "M",            ID_TOGGLE_MODE,         VIRTKEY, CONTROL, NOINVERT
     VK_F4,          ID_CREATE_MODE,         VIRTKEY, NOINVERT
+    VK_F1,          ID_DRAW_MODE,           VIRTKEY, NOINVERT
     VK_F5,          ID_EDIT_MODE,           VIRTKEY, NOINVERT
+    VK_F2,          ID_SELECT_MODE,         VIRTKEY, NOINVERT
     VK_F6,          ID_SIMULATION_MODE,     VIRTKEY, NOINVERT
+    "M",            ID_TOGGLE_MODE,         VIRTKEY, CONTROL, NOINVERT
+    VK_SPACE,       ID_CONTROL,             VIRTKEY, NOINVERT
 END
 
 #endif    // English (United States) resources

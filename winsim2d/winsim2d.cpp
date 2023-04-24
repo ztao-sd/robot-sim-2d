@@ -422,11 +422,17 @@ int Sim2D(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmd
 
 int Sim2D()
 {
-	UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{};
-	Robot2DModel* model = new Robot2DModel{ *robot };
+	//auto range = DPIScale::PixelsToDIPs(1280, 720);
+	//RRT::Tree* tree = new RRT::Tree{ RRT::Vector2d{ {900, 300} }, range.x, range.y, 10 };
+	//tree->ExploreN(1000);
+	//TreeModel* treeModel = new TreeModel{ tree };
+
+	//UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{};
+	//Robot2DModel* model = new Robot2DModel{ *robot };
 	Simulation2D simWin{};
 	//Simulation2D* simWin = new Simulation2D{};
-	simWin.AddRobot(robot, model);
+	//simWin.AddTree(treeModel);
+	//simWin.AddRobot(robot, model);
 	simWin.StartSimulation();
 	simWin.MessageLoop();
 
@@ -888,6 +894,8 @@ void Simulation2D::OnPaint()
 		}
 		
 		obsModels.Draw(pRenderTarget, pBrush);
+		treeModels.Draw(pRenderTarget, pBrush);
+		curveModels.Draw(pRenderTarget, pBrush);
 
 		hr = pRenderTarget->EndDraw(); // End drawing (error signal from here)
 		if (FAILED(hr) || hr == D2DERR_RECREATE_TARGET)
@@ -924,6 +932,8 @@ void Simulation2D::OnLeftButtonDown(int pixelX, int pixelY, DWORD flags)
 			{
 				Eigen::Vector3d initPos{ drawStartPos.x, drawStartPos.y, 0 };
 				UnicycleWMR::Robot* robot = new UnicycleWMR::Robot{ initPos };
+				robot->controller = new UnicycleWMR::Controller();
+				robot->controller->robot = &(robot->model);
 				Robot2DModel* model = new Robot2DModel{ *robot };
 				model->Scale(*robot, 0.1);
 				robotModels.InsertShape(drawStartPos.x, drawStartPos.y, model);
@@ -949,6 +959,44 @@ void Simulation2D::OnLeftButtonDown(int pixelX, int pixelY, DWORD flags)
 			dragObjRelPos.y = mousePos.y - obsModels.SelectedShape()->Reference().y;
 		}
 	}
+	else if (mode == SimMode::Simulation)
+	{
+		if (robotModels.SelectedShape())
+		{
+			// Stop simulation
+			StopControl();
+			controlFlag = false;
+
+			Vector3d home;
+			Vector3d target;
+			UnicycleWMR::Robot* robot = modelRobotMap[robotModels.SelectedShape().get()];
+			robot->controller->Reset(robot->model); // Reset control
+			home << robot->model.State()(0), robot->model.State()(1), robot->model.State()(2);
+			target << mousePos.x, mousePos.y, robot->model.State()(2);
+			if (robot->pathPlanner->PlanPath(home, target, &obsModels))
+			{
+				if (robotTreeMap.find(robot) != robotTreeMap.end())
+				{
+					robotTreeMap[robot]->Reset(robot->pathPlanner->tree.get());
+				}
+				else {
+					TreeModel* treeModel = new TreeModel{ robot->pathPlanner->tree.get() };
+					AddTree(treeModel);
+					robotTreeMap.insert({ robot, treeModel });
+				}
+				if (robotCurveMap.find(robot) != robotCurveMap.end())
+				{
+					robotCurveMap[robot]->Reset(robot->pathPlanner->pathCurve.get());
+				}
+				else {
+					CurveModel* curveModel = new CurveModel{ robot->pathPlanner->pathCurve.get() };
+					AddCurve(curveModel);
+					robotCurveMap.insert({ robot, curveModel });
+				}
+			}
+		}
+	}
+
 	pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity()); // Rotate and translate
 	InvalidateRect(m_hwnd, NULL, FALSE); // Force window to be repainted
 }
@@ -1060,6 +1108,16 @@ void Simulation2D::AddObstacle(RoundObstacle* obstacle)
 	robotSim.AddObstacle(obstacle);
 }
 
+void Simulation2D::AddTree(TreeModel* tree)
+{
+	treeModels.InsertShape(0, 0, tree);
+}
+
+void Simulation2D::AddCurve(CurveModel* curve)
+{
+	curveModels.InsertShape(0, 0, curve);
+}
+
 void Simulation2D::CheckCollision()
 {
 	for (auto i{ robotModels.List().begin() }; i != robotModels.List().end(); ++i)
@@ -1145,17 +1203,34 @@ void Simulation2D::StartSimulation()
 		InvalidateRect(this->Window(), NULL, FALSE);
 	};
 	simTimer.Start(f, simTimer.GetInterval());
-	auto g = [this]()
-	{
-		this->robotSim.ControlStep();
-	};
-	ctrlTimer.Start(g, ctrlTimer.GetInterval());
+	
 }
 
 void Simulation2D::StopSimulation()
 {
 	ctrlTimer.Stop();
 	simTimer.Stop();
+}
+
+void Simulation2D::StartControl()
+{
+	auto robot = modelRobotMap[this->robotModels.SelectedShape().get()];
+	auto& model = robot->model;
+	auto& curve = *(robot->pathPlanner->pathCurve);
+	robot->controller->Reset(model);
+	auto g = [this, robot, &model, &curve]()
+	{
+		robot->controller->UnifiedControl(model, curve);
+		//this->robotSim.ControlStep();
+	};
+	ctrlTimer.Start(g, ctrlTimer.GetInterval());
+}
+
+void Simulation2D::StopControl()
+{
+	auto robot = modelRobotMap[this->robotModels.SelectedShape().get()];
+	robot->controller->Reset(robot->model);
+	ctrlTimer.Stop();
 }
 
 void Simulation2D::CleanUp()
@@ -1232,6 +1307,17 @@ LRESULT Simulation2D::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SetMode(SimMode::Simulation);
 			std::cout << "Simulation Mode" << '\n';
 			break;
+		case ID_CONTROL:
+			if (!controlFlag)
+			{
+				StartControl();
+				controlFlag = true;
+			}
+			else
+			{
+				StopControl();
+				controlFlag = false;
+			}
 		}
 		return 0;
 	default:
@@ -1340,4 +1426,59 @@ BOOL ObstacleModel::HitTest(float dipX, float dipY)
 BOOL ObstacleModel::CheckCollision(IModel& model)
 {
 	return 0;
+}
+
+TreeModel::TreeModel(RRT::Tree* tree) : tree{ tree }
+{
+}
+
+void TreeModel::Reset(RRT::Tree* tree)
+{
+	this->tree = tree;
+}
+
+void TreeModel::Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush)
+{
+	pBrush->SetColor(color);
+	RRT::Tree::EdgeIterator ei, ei_end;
+	for (tie(ei, ei_end) = edges(tree->Graph()); ei != ei_end; ++ei)
+	{
+		auto src = source(*ei, tree->Graph());
+		auto trg = target(*ei, tree->Graph());
+		D2D1_POINT_2F point0{ tree->Graph()[src].state(0), tree->Graph()[src].state(1) };
+		D2D1_POINT_2F point1{ tree->Graph()[trg].state(0), tree->Graph()[trg].state(1) };
+		pRenderTarget->DrawLine(point0, point1, pBrush, 1.0f);
+	}
+	if (!tree->ShortestPath().empty())
+	{
+		pBrush->SetColor(D2D1::ColorF(D2D1::ColorF::PaleVioletRed));
+		for (int i = 0; i < tree->ShortestPath().size() - 1; ++i)
+		{
+			D2D1_POINT_2F point0{ tree->ShortestPath()[i](0), tree->ShortestPath()[i](1) };
+			D2D1_POINT_2F point1{ tree->ShortestPath()[i + 1](0), tree->ShortestPath()[i + 1](1) };
+			pRenderTarget->DrawLine(point0, point1, pBrush, 1.0f);
+		}
+	}
+}
+
+void TreeModel::SetColor(D2D1_COLOR_F color)
+{
+	this->color = color;
+}
+
+void CurveModel::Draw(ID2D1RenderTarget* pRenderTarget, ID2D1SolidColorBrush* pBrush)
+{
+	pBrush->SetColor(color);
+	double time = 0.0;
+	double timeStep = (curve->endTime - curve->startTime) / 100;
+	for (int i = 0; i < 100; ++i)
+	{
+		auto point0 = (*curve)(time);
+		time += timeStep;
+		auto point1 = (*curve)(time);
+		//time += timeStep;
+		D2D1_POINT_2F p0{ point0(0), point0(1)};
+		D2D1_POINT_2F p1{ point1(0), point1(1)};
+		pRenderTarget->DrawLine(p0, p1, pBrush, 1.0f);
+	}
 }
