@@ -36,28 +36,6 @@ namespace RRT
 	using std::pair;
 	using std::tie;
 
-	//template <class PredecessorMap>
-	//class record_predecessors : public dijkstra_visitor<>
-	//{
-	//public:
-	//	record_predecessors(PredecessorMap p)
-	//		: m_predecessor(p) { }
-
-	//	template <class Edge, class Graph>
-	//	void edge_relaxed(Edge e, Graph& g) {
-	//		// set the parent of the target(e) to source(e)
-	//		put(m_predecessor, target(e, g), source(e, g));
-	//	}
-	//protected:
-	//	PredecessorMap m_predecessor;
-	//};
-
-	//template <class PredecessorMap>
-	//record_predecessors<PredecessorMap>
-	//	make_predecessor_recorder(PredecessorMap p) {
-	//	return record_predecessors<PredecessorMap>(p);
-	//}
-
 	struct DataPoint1D
 	{
 		double time;
@@ -339,8 +317,8 @@ namespace UnicycleWMR
 	#define KEY(c) ( GetAsyncKeyState((int)(c)) & (SHORT)0x8000 )
 	private:
 		// Unified parameters
-		double k0 = 0.2;
-		double k1 = 10.0;
+		double k0 = 0.15;
+		double k1 = 9.0;
 		double k2 = 20.0;
 		IAuxiliaryFunction<double>* alpha = new Alpha1();
 		Vector3d RotationTransform(Vector3d state, const double theta);

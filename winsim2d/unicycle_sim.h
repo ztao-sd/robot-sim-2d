@@ -86,16 +86,6 @@ public:
 	void SimStep(const double dT);
 	void SetCtrlInput(const double vl, const double vr);
 	void SetCtrlInput2(const double v, const double w);
-
-	// D2D1_POINT_2F GetPosition() const 
-	// {
-	// 	return D2D1_POINT_2F{ static_cast<float>(x[0]), static_cast<float>(x[1]) };
-	// }
-	// float GetRotation() const { return static_cast<float>(x[2]); }
-	// D2D1_POINT_2F GetRelativeCenterRotation() const
-	// {
-	// 	return D2D1_POINT_2F{ static_cast<float>(relCenterRotation[0]), static_cast<float>(relCenterRotation[1]) };
-	// }
 };
 
 struct Obstacle

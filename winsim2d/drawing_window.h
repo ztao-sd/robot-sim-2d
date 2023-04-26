@@ -14,6 +14,9 @@
 
 #define S_PI 3.14159265358979323846
 
+/*
+* This class represents a bitmap being handle using Windows GDI API.
+*/
 class GdiBitmap
 {
 private:
@@ -229,9 +232,6 @@ public:
 		return D2D1::Point2F(static_cast<float>(x) / s_scale, static_cast<float>(y) / s_scale);
 	}
 };
-
-//float DPIScale::s_scale = 1.0f;
-
 
 #endif
 
